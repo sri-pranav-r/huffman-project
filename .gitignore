@@ -1,0 +1,10 @@
+# compiled program (rebuilt by make or by the web server)
+backend/huff
+# binary test files you generate yourself
+samples/*.bin
+*.huf
+# macOS and editor junk
+.DS_Store
+__pycache__/
+# personal study notes, not part of the project
+STUDY_GUIDE.md

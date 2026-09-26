@@ -1,0 +1,21 @@
+Huffman coding is a lossless data compression algorithm. The idea is to assign
+variable-length codes to input characters, lengths of the assigned codes are
+based on the frequencies of corresponding characters. The most frequent
+character gets the smallest code and the least frequent character gets the
+largest code.
+
+The steps are:
+1. Count the frequency of every character in the file.
+2. Put every character into a min heap, ordered by frequency.
+3. Take the two nodes with the lowest frequency out of the heap, make them the
+   children of a new node whose frequency is their sum, and put the new node
+   back into the heap.
+4. Repeat until only one node remains: that node is the root of the Huffman tree.
+5. Traverse the tree: going left adds a 0 to the code, going right adds a 1.
+6. Replace every character in the file with its code.
+
+Because no code is a prefix of another code, the compressed bits can be decoded
+unambiguously by walking the tree from the root, one bit at a time, until a leaf
+is reached. This project demonstrates dynamic memory allocation, binary trees,
+tree traversals, a binary heap used as a priority queue, and basic hashing
+(the frequency table is an array indexed directly by the byte value).

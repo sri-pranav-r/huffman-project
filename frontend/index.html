@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Huffman Compressor</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #17181c;
+    --muted: #6b7079;
+    --line: #e2e4e9;
+    --accent: #2f6df6;
+    --accent-2: #1d4fd0;
+    --accent-soft: #e8efff;
+    --bar: #2f6df6;
+    --bar-2: #b9cdfb;
+    --ok: #1c8a4e;
+    --bad: #c73a2c;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101114;
+      --card: #191b20;
+      --text: #ecedf0;
+      --muted: #9aa0ab;
+      --line: #2a2d35;
+      --accent: #7ea6ff;
+      --accent-2: #a9c2ff;
+      --accent-soft: #1d2740;
+      --bar: #7ea6ff;
+      --bar-2: #2c3a5e;
+      --ok: #4fc57f;
+      --bad: #ff6f60;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    background:
+      radial-gradient(900px 380px at 50% -120px, var(--accent-soft), transparent 70%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  main { max-width: 680px; margin: 0 auto; padding: 56px 16px 72px; }
+
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 6px 18px rgba(47,109,246,.25);
+  }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+  .tag { color: var(--muted); margin: 0; font-size: 14px; }
+  .sub { color: var(--muted); margin: 14px 0 28px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+  }
+
+  .drop {
+    border: 2px dashed var(--line);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, transform .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop.over { transform: scale(1.01); }
+  .drop svg { width: 36px; height: 36px; color: var(--accent); margin-bottom: 8px; }
+  .drop strong { display: block; font-size: 17px; }
+  .drop span { color: var(--muted); font-size: 14px; }
+  #fileInput { display: none; }
+
+  .file-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-top: 18px; flex-wrap: wrap;
+  }
+  .file-name { font-weight: 600; overflow-wrap: anywhere; }
+  .file-size { color: var(--muted); font-size: 14px; }
+
+  .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .toggle button {
+    background: none; border: 0; padding: 7px 14px; font: inherit; color: var(--muted); cursor: pointer;
+  }
+  .toggle button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff; border: 0;
+    border-radius: 9px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+    text-decoration: none; transition: transform .1s, box-shadow .15s;
+    box-shadow: 0 4px 14px rgba(47,109,246,.25);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: .55; cursor: default; transform: none; }
+
+  .actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; }
+  .spinner {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    animation: spin .7s linear infinite; display: none;
+  }
+  .spinner.on { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* result */
+  #result { animation: rise .3s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stat { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .value { font-size: 21px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; }
+  .stat .value.ok { color: var(--ok); }
+  .stat .value.bad { color: var(--bad); }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+
+  .bars { margin: 18px 0 6px; display: grid; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 64px 1fr 80px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar-row .name { color: var(--muted); }
+  .bar-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .track { height: 10px; background: var(--bar-2); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; width: 0; transition: width .6s ease-out; }
+
+  .download-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 22px; overflow-x: auto; }
+  .tabs button {
+    background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    padding: 8px 12px; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .panel { display: none; padding-top: 14px; }
+  .panel.active { display: block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  td.sym { font-family: var(--mono); width: 70px; }
+  td.freq { width: 200px; }
+  td.freq .mini { display: flex; align-items: center; gap: 8px; }
+  td.freq .track { flex: 1; height: 6px; }
+  td.freq .num { color: var(--muted); font-size: 12px; min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+  td.code { font-family: var(--mono); letter-spacing: .08em; }
+  td.len { color: var(--muted); text-align: right; width: 60px; }
+  .table-wrap { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+
+  pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; font-size: 13px; font-family: var(--mono); overflow: auto; margin: 0; max-height: 420px;
+  }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .error { color: var(--bad); margin-top: 12px; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+  code { font-family: var(--mono); font-size: .92em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo" aria-hidden="true">
+      <!-- tiny binary tree -->
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="5" r="2.2"/><circle cx="6" cy="13" r="2.2"/><circle cx="18" cy="13" r="2.2"/>
+        <circle cx="15" cy="20" r="2.2"/><circle cx="21" cy="20" r="2.2"/>
+        <path d="M10.6 6.6 7.4 11.4M13.4 6.6l3.2 4.8M17 15l-1.2 3M19 15l1.2 3"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Huffman Compressor</h1>
+      <p class="tag">Lossless compression with a min heap and a binary tree, written in C</p>
+    </div>
+  </header>
+  <p class="sub">Drop any file to compress it. Drop a <code>.huf</code> file to get the original back, byte for byte.</p>
+
+  <section class="card">
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+      </svg>
+      <strong>Drop a file here</strong>
+      <span>or click to choose one</span>
+      <input type="file" id="fileInput">
+    </div>
+
+    <div class="file-row hidden" id="fileRow">
+      <div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      <div class="toggle">
+        <button id="modeCompress">Compress</button>
+        <button id="modeDecompress">Decompress</button>
+      </div>
+    </div>
+
+    <div class="actions hidden" id="actions">
+      <button class="btn" id="runBtn">Compress</button>
+      <span class="spinner" id="spinner"></span>
+      <span class="file-size" id="status"></span>
+    </div>
+    <div class="error hidden" id="error"></div>
+  </section>
+
+  <section class="card hidden" id="result">
+    <div class="stats">
+      <div class="stat"><div class="label">Input</div><div class="value" id="inSize"></div></div>
+      <div class="stat"><div class="label">Output</div><div class="value" id="outSize"></div></div>
+      <div class="stat"><div class="label" id="ratioLabel">Saved</div><div class="value" id="ratio"></div></div>
+    </div>
+
+    <div class="bars" id="bars">
+      <div class="bar-row"><span class="name">Input</span><div class="track"><div class="fill" id="barIn"></div></div><span class="num" id="barInNum"></span></div>
+      <div class="bar-row"><span class="name">Output</span><div class="track"><div class="fill" id="barOut"></div></div><span class="num" id="barOutNum"></span></div>
+    </div>
+
+    <div class="download-row">
+      <a class="btn" id="download">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>
+        <span id="downloadText">Download</span>
+      </a>
+      <span class="file-size" id="downloadHint"></span>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+    <div id="panels"></div>
+  </section>
+
+  <footer>Everything above is computed by the C program <code>huff</code>. This page only sends the file to it and shows what it printed.</footer>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let file = null;
+  let mode = "compress";
+  let downloadUrl = null;
+
+  function formatBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function setMode(m) {
+    mode = m;
+    $("modeCompress").classList.toggle("active", m === "compress");
+    $("modeDecompress").classList.toggle("active", m === "decompress");
+    $("runBtn").textContent = m === "compress" ? "Compress" : "Decompress";
+  }
+
+  function pickFile(f) {
+    file = f;
+    $("fileName").textContent = f.name;
+    $("fileSize").textContent = formatBytes(f.size);
+    $("fileRow").classList.remove("hidden");
+    $("actions").classList.remove("hidden");
+    $("result").classList.add("hidden");
+    $("error").classList.add("hidden");
+    setMode(f.name.toLowerCase().endsWith(".huf") ? "decompress" : "compress");
+  }
+
+  // drop zone + file picker
+  const drop = $("drop");
+  drop.addEventListener("click", () => $("fileInput").click());
+  $("fileInput").addEventListener("change", e => { if (e.target.files[0]) pickFile(e.target.files[0]); });
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) pickFile(e.dataTransfer.files[0]); });
+  $("modeCompress").addEventListener("click", () => setMode("compress"));
+  $("modeDecompress").addEventListener("click", () => setMode("decompress"));
+
+  // send the file to the server, which runs the C program
+  async function run() {
+    if (!file) return;
+    $("runBtn").disabled = true;
+    $("spinner").classList.add("on");
+    $("status").textContent = "Running huff...";
+    $("error").classList.add("hidden");
+    try {
+      const res = await fetch("/" + mode, { method: "POST", headers: { "X-Filename": file.name }, body: file });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Something went wrong");
+      showResult(data);
+    } catch (err) {
+      $("error").textContent = err.message;
+      $("error").classList.remove("hidden");
+    } finally {
+      $("runBtn").disabled = false;
+      $("spinner").classList.remove("on");
+      $("status").textContent = "";
+    }
+  }
+  $("runBtn").addEventListener("click", run);
+
+  // Split the C program's output into sections by its "=== Name ===" headings.
+  function parseSections(log) {
+    const sections = {};
+    let current = "Output";
+    for (const line of log.split("\n")) {
+      const m = line.match(/^=== (.+) ===$/);
+      if (m) { current = m[1]; sections[current] = ""; continue; }
+      sections[current] = (sections[current] || "") + line + "\n";
+    }
+    for (const k in sections) sections[k] = sections[k].trim();
+    return sections;
+  }
+
+  // Turn the "Symbol Freq Code" text into rows: [{sym, freq, code}]
+  function parseCodeTable(text) {
+    const rows = [];
+    for (const line of text.split("\n").slice(1)) {
+      const m = line.match(/^(\S+)\s+(\d+)\s+([01]+)$/);   // symbol, freq, code
+      if (m) rows.push({ sym: m[1], freq: +m[2], code: m[3] });
+    }
+    return rows.sort((a, b) => b.freq - a.freq);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function buildCodeTable(rows) {
+    const max = Math.max(...rows.map(r => r.freq));
+    let html = '<p class="note">Sorted by frequency. Frequent symbols get short codes.</p>' +
+      '<div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Frequency</th><th>Code</th><th style="text-align:right">Bits</th></tr></thead><tbody>';
+    for (const r of rows) {
+      html += `<tr><td class="sym">${escapeHtml(r.sym)}</td>` +
+        `<td class="freq"><div class="mini"><div class="track"><div class="fill" style="width:${(r.freq / max * 100).toFixed(1)}%"></div></div><span class="num">${r.freq}</span></div></td>` +
+        `<td class="code">${r.code}</td><td class="len">${r.code.length}</td></tr>`;
+    }
+    return html + "</tbody></table></div>";
+  }
+
+  function buildTabs(tabs) {
+    $("tabs").innerHTML = "";
+    $("panels").innerHTML = "";
+    tabs.forEach((t, i) => {
+      const b = document.createElement("button");
+      b.textContent = t.name;
+      b.className = i === 0 ? "active" : "";
+      const p = document.createElement("div");
+      p.className = "panel" + (i === 0 ? " active" : "");
+      p.innerHTML = t.html;
+      b.addEventListener("click", () => {
+        [...$("tabs").children].forEach(x => x.classList.remove("active"));
+        [...$("panels").children].forEach(x => x.classList.remove("active"));
+        b.classList.add("active"); p.classList.add("active");
+      });
+      $("tabs").appendChild(b);
+      $("panels").appendChild(p);
+    });
+  }
+
+  function showResult(d) {
+    const sections = parseSections(d.log);
+
+    $("inSize").textContent = formatBytes(d.inputSize);
+    $("outSize").textContent = formatBytes(d.outputSize);
+
+    const ratioEl = $("ratio");
+    if (d.mode === "compress") {
+      const saved = d.inputSize ? (1 - d.outputSize / d.inputSize) * 100 : 0;
+      $("ratioLabel").textContent = saved >= 0 ? "Saved" : "Grew by";
+      ratioEl.textContent = Math.abs(saved).toFixed(1) + "%";
+      ratioEl.className = "value " + (saved >= 0 ? "ok" : "bad");
+    } else {
+      $("ratioLabel").textContent = "Result";
+      ratioEl.textContent = "Restored";
+      ratioEl.className = "value ok";
+    }
+
+    // size comparison bars, scaled to the larger of the two
+    const big = Math.max(d.inputSize, d.outputSize, 1);
+    $("barInNum").textContent = d.inputSize.toLocaleString() + " B";
+    $("barOutNum").textContent = d.outputSize.toLocaleString() + " B";
+    $("barIn").style.width = "0"; $("barOut").style.width = "0";
+    requestAnimationFrame(() => {
+      $("barIn").style.width = (d.inputSize / big * 100) + "%";
+      $("barOut").style.width = (d.outputSize / big * 100) + "%";
+    });
+
+    // turn the base64 text back into a file the browser can download
+    const bytes = Uint8Array.from(atob(d.data), c => c.charCodeAt(0));
+    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    downloadUrl = URL.createObjectURL(new Blob([bytes]));
+    const a = $("download");
+    a.href = downloadUrl;
+    a.download = d.outputName;
+    $("downloadText").textContent = "Download " + d.outputName;
+    $("downloadHint").textContent = d.mode === "compress" ? "Drop this file back in to decompress it" : "";
+
+    // tabs, one per section the C program printed
+    const tabs = [];
+    if (sections["Code table"]) tabs.push({ name: "Code table", html: buildCodeTable(parseCodeTable(sections["Code table"])) });
+    if (sections["Huffman tree"]) tabs.push({ name: "Tree", html: '<p class="note">Pre-order traversal. [n] is an internal node with total frequency n, indented lines are its children.</p><pre>' + escapeHtml(sections["Huffman tree"]) + "</pre>" });
+    tabs.push({ name: "Raw output", html: "<pre>" + escapeHtml(d.log.trim()) + "</pre>" });
+    buildTabs(tabs);
+
+    $("result").classList.remove("hidden");
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+</script>
+</body>
+</html>
